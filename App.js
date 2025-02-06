@@ -1,99 +1,106 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, ActivityIndicator, Alert } from 'react-native';
-import axios from 'axios';
+import { View, Text, ActivityIndicator, Alert, ScrollView, RefreshControl } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './screens/HomeScreen';
-import ChatScreen from './screens/ChatScreen';
 
-// Create a Stack Navigator
 const Stack = createStackNavigator();
 
 function LoginScreen({ navigation }) {
-  const [qrCode, setQrCode] = useState(null);  // State to store the QR code
-  const [isLoggedIn, setIsLoggedIn] = useState(false);  // State to track login
-  const [loading, setLoading] = useState(true);  // State for loading indicator
-  const [error, setError] = useState(null);  // State for error messages
-  const [isWhatsAppReady, setIsWhatsAppReady] = useState(false);  // State for WhatsApp status
-  const [whatsappStatus, setWhatsappStatus] = useState('Checking...'); // WhatsApp status message
+  const [qrCode, setQrCode] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isWhatsAppReady, setIsWhatsAppReady] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState('Checking...');
+  const [refreshing, setRefreshing] = useState(false);
 
   const backendUrl = 'http://192.168.4.214:3000';  // Replace with your actual backend URL
 
-  // Fetch QR code from backend
   useEffect(() => {
-    axios.get(`${backendUrl}/qrcode`)
-      .then(response => {
-        const qr = response.data.qr;
-        console.log('QR Code Response:', response.data);  // Log the full response
-        console.log('QR Code received:', qr);
+    // Fetch QR code initially
+    fetchQRCode();
 
-        if (qr && typeof qr === 'string') {
-          setQrCode(qr);  // Set the QR code data to state
-        } else {
-          console.error('Received invalid QR data:', qr);
-          Alert.alert('Error', 'Invalid QR data received!');
-        }
-        setLoading(false);  // Set loading to false after fetching QR code
-      })
-      .catch(error => {
-        console.error('Error fetching QR code:', error);
-        setLoading(false);  // Set loading to false in case of error
-        setError('Failed to fetch QR code!');
-        Alert.alert('Error', 'Failed to fetch QR code!');
-      });
-
-    // Polling WhatsApp status every 3 seconds to check if it's ready
+    // Polling WhatsApp status every 5 seconds to check if it's ready
     const statusInterval = setInterval(() => {
-      axios.get(`${backendUrl}/whatsapp-status`)
-        .then(response => {
-          console.log('WhatsApp Status Response:', response.data);  // Log the full status response
-          if (response.data.status === 'ready') {
-            console.log('WhatsApp is ready!');
-            setIsWhatsAppReady(true);  // WhatsApp is ready
+      fetch(`${backendUrl}/whatsapp-status`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'ready') {
+            setIsWhatsAppReady(true);
             setWhatsappStatus('WhatsApp is Ready!');
-            setIsLoggedIn(true);  // Mark as logged in
-            clearInterval(statusInterval);  // Clear the interval once it's ready
-            navigation.replace('Home');  // Navigate to Home screen after WhatsApp is ready
+            setIsLoggedIn(true);
+            clearInterval(statusInterval);
+            navigation.replace('Home');
           } else {
             setWhatsappStatus('WhatsApp is not ready. Please wait...');
           }
         })
         .catch(error => {
-          console.error('Error fetching WhatsApp status:', error);
           Alert.alert('Error', 'Failed to check WhatsApp status!');
         });
-    }, 10000);  // Check status every 3 seconds
+    }, 5000);
 
-    return () => clearInterval(statusInterval);  // Cleanup the interval on component unmount
-  }, [navigation]);  // Adding navigation as a dependency to ensure it's up-to-date
+    return () => clearInterval(statusInterval);
+  }, [navigation]);
+
+  // Fetch the QR code from the API
+  const fetchQRCode = () => {
+    setLoading(true);  // Show loading indicator
+    fetch(`${backendUrl}/qrcode`)
+      .then(response => response.json())
+      .then(data => {
+        const qr = data.qr;
+        if (qr && typeof qr === 'string') {
+          setQrCode(qr);  // Set the QR code data
+        } else {
+          Alert.alert('Error', 'Invalid QR data received!');
+        }
+        setLoading(false);  // Hide loading indicator
+      })
+      .catch(error => {
+        setLoading(false);  // Hide loading indicator
+        setError('Failed to fetch QR code!');
+        Alert.alert('Error', 'Failed to fetch QR code!');
+      });
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);  // Start refreshing
+    fetchQRCode();  // Fetch the QR code again
+    setRefreshing(false);  // Stop refreshing
+  };
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" />  // Show loading indicator
-      ) : (
-        <View style={{ alignItems: 'center' }}>
-          {!isLoggedIn ? (
-            <>
-              <Text>Scan this QR code to log in to WhatsApp</Text>
-              {qrCode ? (
-                <QRCode value={qrCode} size={200} />  // QR code for WhatsApp login
-              ) : (
-                <Text>QR Code not available yet</Text>  // Show a message if QR code is not available
-              )}
-            </>
-          ) : (
-            <>
-              <Text>Logged in successfully! Redirecting to home...</Text>
-            </>
-          )}
-          {error && <Text style={{ color: 'red' }}>{error}</Text>}
-
-          {/* Display WhatsApp status */}
-          <Text>{whatsappStatus}</Text>
-        </View>
-      )}
+      <ScrollView
+        contentContainerStyle={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+        {loading ? (
+          <ActivityIndicator size="large" color="#0000ff" />
+        ) : (
+          <View style={{ alignItems: 'center' }}>
+            {!isLoggedIn ? (
+              <>
+                <Text>Scan this QR code to log in to WhatsApp</Text>
+                {qrCode ? (
+                  <QRCode value={qrCode} size={200} />
+                ) : (
+                  <Text>QR Code not available yet</Text>
+                )}
+              </>
+            ) : (
+              <>
+                <Text>Logged in successfully! Redirecting to home...</Text>
+              </>
+            )}
+            {error && <Text style={{ color: 'red' }}>{error}</Text>}
+            <Text>{whatsappStatus}</Text>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -103,8 +110,7 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="Home" options={{ headerShown: false }} component={HomeScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

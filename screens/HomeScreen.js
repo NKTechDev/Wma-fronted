@@ -41,7 +41,7 @@ function HomeScreen({ navigation }) {
         <View style={styles.contactInfo}>
           <Text style={styles.contactName}>{contactName}</Text>
           <Text style={styles.contactDuration}>Duration: {duration} seconds</Text>
-          <Text style={styles.contactTimestamp}>{new Date(timestamp * 1000).toLocaleString()}</Text>
+          <Text style={styles.contactTimestamp}>{timestamp}</Text>
         </View>
       </TouchableOpacity>
     );

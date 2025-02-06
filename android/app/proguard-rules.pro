@@ -9,4 +9,6 @@
 
 # Add any project specific keep options here:
 
--keep class org.webrtc.** { *;}
+--keep class org.webrtc.** { *; } 
+--keep class okhttp3.** { *; }
+--keep class com.facebook.react.modules.** { *; }
